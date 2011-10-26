@@ -22,5 +22,8 @@ var Log = {
       this.elem = document.getElementById('log');
     this.elem.innerHTML = text;
     this.elem.style.left = (500 - this.elem.offsetWidth / 2) + 'px';
+	if (window.console && window.console.log) {
+		console.log(text)
+	}
   }
 };

@@ -446,6 +446,18 @@ $.event = {
   }
 };
 
+$.keys = function(object) {
+	var out = [];
+	for (k in object) { out.push(k)};
+	return out;
+};
+
+$.values = function(object) {
+	var out = [];
+	for (k in object) { out.push(object[k])};
+	return out;
+};
+
 $jit.util = $jit.id = $;
 
 var Class = function(properties) {

@@ -206,6 +206,31 @@ $jit.Graph = new Class({
     return this.edges[obj.id][obj2.id];
  },
 
+
+	eachAdjacency: function(action, filter) {
+		//this implementation is really lame
+		var duplicatedEdges = [];
+		for (var i in this.edges) {
+			for (var j in this.edges[i]) {
+				duplicatedEdges.push(this.edges[i][j]);
+			}
+		}
+		var e;
+		for (var i = 0 ; i < duplicatedEdges.length; i++) {
+			e = duplicatedEdges[i]; 
+			if (!e._visited) {
+				if (!filter || filter(e)) {
+					action(e);
+				}
+				e._visited = true;
+			}
+		}
+		//clear visited flags
+		for (var i = 0 ; i < duplicatedEdges.length; i++) {
+			delete duplicatedEdges[i]._visited;
+		}
+	},
+
     /*
      Method: removeNode
     
@@ -750,6 +775,35 @@ Graph.Node = new Class({
         return this.adjacencies[id];
     },
 
+	getNeighbourAlong: function(adjacency) {
+		var out = null;
+		if (adjacency.nodeFrom == this) {
+			out = adjacency.nodeTo;
+		}
+		else if (adjacency.nodeTo == this) {
+			out = adjacency.nodeFrom;
+		}
+		return out;
+	},
+
+	getAdjacencies: function() {
+		var adjs = [];
+		this.eachAdjacency(function(adj) { adjs.push(adj)});
+		return adjs;
+	},
+
+	getInAdjacencies: function() {
+		var adjs = [];
+		this.eachInAdjacency(function(adj){ adjs.push(adj)});
+		return adjs;
+	},
+	
+	getOutAdjacencies: function() {
+		var adjs = [];
+		this.eachOutAdjacency(function(adj){ adjs.push(adj)});
+		return adjs;
+	},
+
     /*
       Method: getPos
    
@@ -859,6 +913,7 @@ Graph.Util = {
        For internal use only. Provides a filtering function based on flags.
     */
     filter: function(param) {
+		if ($.type(param) == "function") return param;
         if(!param || !($.type(param) == 'string')) return function() { return true; };
         var props = param.split(" ");
         return function(elem) {
@@ -996,6 +1051,28 @@ Graph.Util = {
           }
         }
     },
+
+	dirAdjacencyFilter: function(node, adj, dir) {
+		var dirs = adj.data["$direction"];
+		return !dirs || (dirs[dir] == node.id);
+	},
+
+	isInAdjacency: function(node, adj) { return this.dirAdjacencyFilter(node, adj,1)},
+
+	isOutAdjacency: function(node, adj) { return this.dirAdjacencyFilter(node, adj,0)},
+
+	eachDirAdjacency: function(node, action, dir) {
+		var that = this;
+		this.eachAdjacency(node, action, function(adj) {
+			return that.dirAdjacencyFilter(node, adj, dir);
+		})
+	},
+
+	eachInAdjacency: function(node, action) { this.eachDirAdjacency(node, action, 1)},
+
+	eachOutAdjacency: function(node, action) { this.eachDirAdjacency(node, action, 0)},
+
+	
 
      /*
        Method: computeLevels
@@ -1377,7 +1454,7 @@ $.each(['get', 'getNode', 'each', 'eachNode', 'computeLevels', 'eachBFS', 'clean
 });
 
 //Append node methods to <Graph.Node>
-$.each(['eachAdjacency', 'eachLevel', 'eachSubgraph', 'eachSubnode', 'anySubnode', 'getSubnodes', 'getParents', 'isDescendantOf'], function(m) {
+$.each(['eachAdjacency', 'eachInAdjacency', 'eachOutAdjacency', 'eachLevel', 'eachSubgraph', 'eachSubnode', 'anySubnode', 'getSubnodes', 'getParents', 'isDescendantOf'], function(m) {
   Graph.Node.prototype[m] = function() {
     return Graph.Util[m].apply(Graph.Util, [this].concat(Array.prototype.slice.call(arguments)));
   };

@@ -14,6 +14,10 @@ var dagData = [
 	{
 		data: {"$direction":["ews","ews_part2"]},
 		nodeTo: "ews_part2"
+	},
+	{
+		data: {"$direction":["ews","ews_part3"]},
+		nodeTo: "ews_part3"
 	}
 	]
 },
@@ -41,10 +45,31 @@ var dagData = [
 		nodeTo: "appliance1"
 	}]
 },
+{
+	id:"ews_part3",
+	name:"sample_ews_part3",
+	data: {
+		"$color":"green",
+		"$type":"triangle",
+	},
+	adjacencies: [{
+		data: {"$direction":["ews_part3", "appliance2"]},
+		nodeTo: "appliance2"
+	}]
+},
 
 {
 	id:"appliance1",
 	name:"sample_appliance1",
+	data: {
+		"$color":"green",
+		"$type":"circle",
+	},
+	adjacencies: []
+},
+{
+	id:"appliance2",
+	name:"sample_appliance2",
 	data: {
 		"$color":"green",
 		"$type":"circle",

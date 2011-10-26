@@ -36,13 +36,14 @@ Layouts.DAG = new Class({
    * 
    * Performs the main algorithm for computing node positions.
    */
-  computePositions : function(property, getLength) {
+  _computePositions : function(property, getLength) {
     var propArray = property;
     var graph = this.graph;
     var root = graph.getNode(this.root);
     var parent = this.parent;
     var config = this.config;
 	Log.write("Computing positions");
+	
 	
 
     for ( var i=0, l=propArray.length; i < l; i++) {
@@ -102,6 +103,178 @@ Layouts.DAG = new Class({
       }
     }, "ignore");
   },
+
+
+/*
+	copySubtree: function(root) {
+		var i = 0; 
+		var newRoot = {
+			children: [],
+			node: root.node
+		};
+		var newChild;
+		for (i = 0; i < root.children.length; i++) {
+			newChild = copySubtree(root.children[i]);
+			newChild.parent = newRoot;
+			newRoot.children.push(newChild);
+		}
+		return newRoot;
+	},
+*/
+
+
+	innerSpace: 1,
+	
+	computePositions: function(property, getLength) {
+		 var propArray = property;
+	    var graph = this.graph;
+	    var root = graph.getNode(this.root);
+	    var parent = this.parent;
+	    var config = this.config;
+		var dim = config.Node.dim;
+		Log.write("Computing positions");
+		var sortedGraph = this.op.topologicalSort(this.graph);
+		var tree = this.createTreeCopy(sortedGraph);
+		var steps = 2;
+		var length;
+		for (var i= 1; i <= steps; i++) {
+			this.computeSpanForTreeCopy(tree);
+			this.computeOrderWeights(sortedGraph, tree);
+			console.log("After step " + i);
+		}
+
+		$.each(sortedGraph, function(n) {
+			console.log(n.id+" x="+n.dag.x+", y="+n._depth +", orderWeight = " + n.dag.orderWeight);
+			length = getLength(n);
+			n.setPos($C(length*n.dag.x, length*n._depth));
+		});
+		
+	},
+
+	createTreeCopyFromNode: function(n) {
+		var treeNode = {
+			node: n,
+			children: [],
+		};
+		if (!n.dag.copies) {
+			n.dag.copies = [];
+		}
+		n.dag.copies.push(treeNode);
+		var otherTreeNode, other;
+		var that = this;
+		n.eachOutAdjacency(function(adj) {
+			other = n.getNeighbourAlong(adj);
+			otherTreeNode = that.createTreeCopyFromNode(other);
+			otherTreeNode.parent = treeNode;
+			treeNode.children.push(otherTreeNode);
+		});
+		return treeNode;
+	},
+
+	createTreeCopy: function(sortedGraph) {
+		var i, n;
+		for (i = 0; i < sortedGraph.length; i++) {
+			sortedGraph[i].dag = {};
+		}
+		//gather top level vertices
+		var topLevel = [];
+		var n = null;
+		for (i = 0; i < sortedGraph.length && (n == null || sortedGraph[i]._depth == n._depth); i++) {
+			n = sortedGraph[i];
+			topLevel.push(n);
+		}
+		var root, tn;
+		/* add virtual root if needed */
+		if (topLevel.length > 1) {
+			root = {
+				children: [],
+				node: null
+			}
+			for (i = 0; i < topLevel.length; i++) {
+				tn = this.createTreeCopyFromNode(topLevel[i]);
+				tn.parent = root;
+				root.children.push(tn);
+			}
+		}
+		else if (topLevel.length == 1) {
+			root = this.createTreeCopyFromNode(topLevel[0]);
+		}
+		else {
+			root = null;
+		}
+		return root;
+	},
+
+	computeOrderWeights: function(sortedGraph, tree) {
+		// compute X positions of all nodes
+		var i,j,n,m, sum, count;
+		for (i = 0; i < sortedGraph.length; i++) {
+			n = sortedGraph[i];
+			//n's x position is equal to average of x position of all copies
+			sum = 0;
+			$.each(n.dag.copies, function(tn) { sum += tn.x});
+			console.log(n.id+" sum = " + sum);
+			n.dag.x = sum/n.dag.copies.length;
+		}
+		
+		var currentDepth = 0;
+		var count = 0;
+		//compute orderWeight for each node
+		for (i = 0; i < sortedGraph.length; i++) {
+			n = sortedGraph[i];
+			if (n._depth > currentDepth) {
+				count = i;
+				currentDepth = n._depth;
+			}
+			sum = 0;
+			j = 0;
+			while ((m = sortedGraph[j])._depth < currentDepth) { j++; sum += m.dag.x};
+			n.dag.orderWeight = (count > 0)?sum/count:0;
+		};
+		//sort all tree copy nodes by order weights
+		var tnCompare = function(tn1,tn2) { return tn1.node.orderWeight - tn2.node.orderWeight};
+		this.treePreorder(tree, function(n) { n.children.sort(tnCompare)});
+	},
+
+	treePreorder: function(treeRoot, fn) {
+		fn(treeRoot);
+		var i,l;
+		for (i = 0, l = treeRoot.children.length; i < l; i++) {
+			fn(treeRoot.children[i]);
+		}
+	},
+
+	computeWidthsForTreeCopy: function(subtree) {
+		var i;
+		var sum = 0;
+		for (i = 0; i < subtree.children.length; i++) {
+			this.computeWidthsForTreeCopy(subtree.children[i]);
+			sum += subtree.children[i].width;
+		}
+		//we are assuming self-width to be 1
+		subtree.width = Math.max(sum + this.innerSpace * (subtree.children.length-1), 1);
+	},
+
+	computeSpanForTreeCopy: function(treeRoot) {
+		this.computeWidthsForTreeCopy(treeRoot);
+		var that = this;
+		if (!treeRoot.span) {
+			treeRoot.span = {left:0, right: treeRoot.width};
+		}
+		treeRoot.x = (treeRoot.span.left + treeRoot.span.right)/2;
+		this.treePreorder(treeRoot, function(node) {
+			var i;
+			var leftOffset = node.span.left;
+			var tn;
+			for (i = 0; i < node.children.length; i++) {
+				tn = node.children[i];
+				tn.span = {left: leftOffset, right: leftOffset + tn.width}
+				leftOffset += tn.width + that.innerSpace;
+				tn.x = (tn.span.right + tn.span.left)/2;
+				console.log("id = " + tn.node.id + " x = " + tn.x +", span.left = " + tn.span.left +", span.right = " + tn.span.right +" width = " + tn.width + " leftOffset=" + leftOffset);
+			}
+		})
+	},
 
   /*
    * Method: setAngularWidthForNodes

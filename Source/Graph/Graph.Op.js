@@ -649,6 +649,48 @@ Graph.Op = {
             });
         }); 
         return fadeEdges;
-    }
+    },
+
+	topologicalSort: function() {
+		var order = [];
+		var set = {};
+		var graph = this.viz.graph;
+		//find nodes without in-edges
+		graph.eachNode(function(node) {
+			if (node.getInAdjacencies().length == 0) { 
+				node._depth = 0;
+				set[node.id] = node;
+			}
+		});
+
+		//while set is not empty do
+		while ($.keys(set).length > 0) {
+			//take first element from set
+			var n = set[$.keys(set)[0]];
+			order.push(n);
+			var neighbours = [];
+			n.eachOutAdjacency(function(adj) {
+				var other = adj.nodeTo;
+				adj._sortVisited = true;
+				
+				//if all incoming adjacencies of "other" node have been visited then add it to the set
+				var unvisitedCount = 0;
+				other.eachInAdjacency(function(adj) { if (!adj._sortVisited) {unvisitedCount ++}});
+				if (unvisitedCount == 0) {
+					other._depth = n._depth + 1;
+					set[other.id] = other;
+				}
+			});
+			
+			//remove this element from set
+			delete set[n.id];
+		}
+
+		//clear  flags
+		graph.eachAdjacency(function(adj) {
+			delete adj._sortVisited;
+		});
+		return order;
+	}
 };
 

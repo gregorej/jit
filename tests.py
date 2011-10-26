@@ -1,6 +1,18 @@
 #tests models
 tests_model = {
 
+	'DAG': [
+		{
+			'Title':'DAG demo',
+			'Description':
+			"""
+			Simple description
+			""",
+			'Extras':[],
+			'Example': False
+		}
+	],
+
     'RGraph': [
         {
             'Title': 'Tree Animation',

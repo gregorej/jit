@@ -80,7 +80,7 @@ $jit.DAG = new Class( {
     }
 
     this.graphOptions = {
-      'klass': Polar,
+      'klass': Complex,
       'Node': {
         'selected': false,
         'exist': true,
@@ -114,7 +114,7 @@ $jit.DAG = new Class( {
   createLevelDistanceFunc: function(){
     var ld = this.config.levelDistance;
     return function(elem){
-      return (elem._depth + 1) * ld;
+      return ld;
     };
   },
 
