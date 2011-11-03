@@ -52,10 +52,16 @@ var dagData = [
 		"$color":"green",
 		"$type":"triangle",
 	},
-	adjacencies: [{
-		data: {"$direction":["ews_part3", "appliance2"]},
-		nodeTo: "appliance2"
-	}]
+	adjacencies: [
+		{
+			data: {"$direction":["ews_part3", "appliance2"]},
+			nodeTo: "appliance2"
+		},
+		{
+			data: {"$direction":["ews_part3", "appliance1"]},
+			nodeTo: "appliance1"
+		},
+	]
 },
 
 {

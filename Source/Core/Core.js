@@ -169,6 +169,16 @@ $.map = function(array, f) {
   return ans;
 };
 
+
+/*
+  Method: log
+*/
+$.log = function(message) {
+	if (window.console && window.console.log) {
+		console.log(message)
+	}
+};
+
 /*
   Method: reduce
   

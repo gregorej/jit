@@ -1,11 +1,11 @@
 /*
  * Class: Layouts.DAG
  * 
- * Implements a Radial Layout.
+ * Implements a DAG Layout.
  * 
  * Implemented By:
  * 
- * <RGraph>, <Hypertree>
+ * <DAG>
  * 
  */
 
@@ -31,80 +31,6 @@ Layouts.DAG = new Class({
     this.computePositions(prop, lengthFunc);
   },
 
-  /*
-   * computePositions
-   * 
-   * Performs the main algorithm for computing node positions.
-   */
-  _computePositions : function(property, getLength) {
-    var propArray = property;
-    var graph = this.graph;
-    var root = graph.getNode(this.root);
-    var parent = this.parent;
-    var config = this.config;
-	Log.write("Computing positions");
-	
-	
-
-    for ( var i=0, l=propArray.length; i < l; i++) {
-      var pi = propArray[i];
-      root.setPos($P(0, 0), pi);
-      root.setData('span', Math.PI * 2, pi);
-    }
-
-    root.angleSpan = {
-      begin : 0,
-      end : 2 * Math.PI
-    };
-
-    graph.eachBFS(this.root, function(elem) {
-      var angleSpan = elem.angleSpan.end - elem.angleSpan.begin;
-      var angleInit = elem.angleSpan.begin;
-      var len = getLength(elem);
-      //Calculate the sum of all angular widths
-      var totalAngularWidths = 0, subnodes = [], maxDim = {};
-      elem.eachSubnode(function(sib) {
-        totalAngularWidths += sib._treeAngularWidth;
-        //get max dim
-        for ( var i=0, l=propArray.length; i < l; i++) {
-          var pi = propArray[i], dim = sib.getData('dim', pi);
-          maxDim[pi] = (pi in maxDim)? (dim > maxDim[pi]? dim : maxDim[pi]) : dim;
-        }
-        subnodes.push(sib);
-      }, "ignore");
-      //Maintain children order
-      //Second constraint for <http://bailando.sims.berkeley.edu/papers/infovis01.htm>
-      if (parent && parent.id == elem.id && subnodes.length > 0
-          && subnodes[0].dist) {
-        subnodes.sort(function(a, b) {
-          return (a.dist >= b.dist) - (a.dist <= b.dist);
-        });
-      }
-      //Calculate nodes positions.
-      for (var k = 0, ls=subnodes.length; k < ls; k++) {
-        var child = subnodes[k];
-        if (!child._flag) {
-          var angleProportion = child._treeAngularWidth / totalAngularWidths * angleSpan;
-          var theta = angleInit + angleProportion / 2;
-
-          for ( var i=0, l=propArray.length; i < l; i++) {
-            var pi = propArray[i];
-            child.setPos($P(theta, len), pi);
-            child.setData('span', angleProportion, pi);
-            child.setData('dim-quotient', child.getData('dim', pi) / maxDim[pi], pi);
-          }
-
-          child.angleSpan = {
-            begin : angleInit,
-            end : angleInit + angleProportion
-          };
-          angleInit += angleProportion;
-        }
-      }
-    }, "ignore");
-  },
-
-
 /*
 	copySubtree: function(root) {
 		var i = 0; 
@@ -121,8 +47,6 @@ Layouts.DAG = new Class({
 		return newRoot;
 	},
 */
-
-
 	innerSpace: 1,
 	
 	computePositions: function(property, getLength) {
@@ -139,15 +63,119 @@ Layouts.DAG = new Class({
 		var length;
 		for (var i= 1; i <= steps; i++) {
 			this.computeSpanForTreeCopy(tree);
-			this.computeOrderWeights(sortedGraph, tree);
-			console.log("After step " + i);
+			this.reduceEdgeCrossings(sortedGraph, tree);
+			$.log("After step " + i);
+		}
+		this.straightenLevels(sortedGraph);
+		
+		var scale = this.config.levelDistance;
+		var width = tree.width * scale;
+		var height = scale * sortedGraph[sortedGraph.length-1]._depth
+		$.each(sortedGraph, function(n) {
+			$.log(n.id+" x="+n.dag.x+", y="+n._depth +", orderWeight = " + n.dag.orderWeight);
+			length = getLength(n);
+			n.setPos($C(length*n.dag.x - width / 2, length*n._depth - height / 2));
+		});
+		
+	},
+
+	getNodesByLevel: function(sortedGraph, level) {
+		var out = [];
+		$.each(sortedGraph, function(n) { if (n.dag.level == level) out.push(n)});
+		return out;
+	},
+
+	straightenLevels: function(sortedGraph) {
+		var levelNum = sortedGraph[sortedGraph.length-1].dag.level;
+		//we are going bottom-up with levels
+		for (var i = levelNum; i>=0; i--) {
+			this.straightenLevel(sortedGraph, i);
+		}
+	},
+
+	straightenLevel: function(sortedGraph, level) {
+		var sc = 3;//Slot count
+		var nodes = this.getNodesByLevel(sortedGraph, level);
+		var slots = {};
+		var optValue = {};
+		var pos, sum, count, parentMed, childMed, parentCount, childrenCount;
+		
+		//sort nodes by their x position
+		nodes.sort(function(n1,n2) { return n1.dag.x - n2.dag.x});
+		$.log(nodes);
+
+		//compute slots values
+		$.each(nodes, function(n) {
+			sum = 0;
+			parentCount = 0;
+			childrenCount = 0;
+			
+			slots[n.id] = new Array(sc);
+			//compute parent median slot
+			n.eachInAdjacency(function(inAdj) {
+				sum += n.getNeighbourAlong(inAdj).dag.x;
+				parentCount++;
+			});
+			parentMed = (parentCount > 0)?sum/parentCount:n.dag.x;
+			slots[n.id][1] = {value: (parentCount > 0)?1:0, pos: parentMed};
+			
+			sum = 0;
+			//compute children median slot
+			n.eachOutAdjacency(function(outAdj) {
+				sum += n.getNeighbourAlong(outAdj).dag.x;
+				childrenCount ++;
+			});
+			childMed = (childrenCount > 0)?sum/childrenCount:n.dag.x;
+			slots[n.id][2] = {value: (childrenCount > 0)?1:0, pos: childMed};
+
+			slots[n.id][0] = {value: ((parentCount > 0 && n.dag.x == parentMed) || (childrenCount > 0 && n.dag.x == childMed))?1:0, pos:n.dag.x};
+		});
+
+		var l = nodes.length;
+		var lastNode = nodes[l-1];
+		var optValues = new Array(l);
+		optValues[l-1] = new Array(sc);
+		for (var i = 0; i < sc; i++) {
+			optValues[l-1][i] = slots[lastNode.id][i].value;
 		}
 
-		$.each(sortedGraph, function(n) {
-			console.log(n.id+" x="+n.dag.x+", y="+n._depth +", orderWeight = " + n.dag.orderWeight);
-			length = getLength(n);
-			n.setPos($C(length*n.dag.x, length*n._depth));
-		});
+		var otherNode, node, best,i,m,s;
+		for (m = nodes.length-2; m >=0; m--) {
+			optValues[m] = new Array(sc);
+			otherNode = nodes[m+1];
+			node = nodes[m];
+			for (s =0; s < sc; s++) {
+				best = 0;
+				for (i = 0; i < sc; i++) {
+					if (slots[otherNode.id][i].pos > slots[node.id][s].pos) {
+						if (optValues[m+1][i] > optValues[m+1][best]) {
+							best = i;
+						}
+					}
+				}
+				optValues[m][s] = optValues[m+1][best]+slots[node.id][s].value;
+			}
+		}
+
+		$.log(slots);
+		$.log(optValues);
+		best = 0;
+		var previousBest = -1;
+		for (m=0; m < l; m++) {
+			best = 0;
+			for (i = 0; i < sc; i++) {
+				if (previousBest == -1 || slots[nodes[m-1].id][previousBest].pos < slots[nodes[m].id][i].pos) {
+					if (optValues[m][i] > optValues[m][best]) {
+						best = i;
+					}
+				}
+			}
+			node = nodes[m];
+			node.dag.slot = slots[node.id][best];
+			node.dag.x = slots[node.id][best].pos;
+			previousBest = best;
+		}
+		$.log(nodes);
 		
 	},
 
@@ -173,9 +201,6 @@ Layouts.DAG = new Class({
 
 	createTreeCopy: function(sortedGraph) {
 		var i, n;
-		for (i = 0; i < sortedGraph.length; i++) {
-			sortedGraph[i].dag = {};
-		}
 		//gather top level vertices
 		var topLevel = [];
 		var n = null;
@@ -205,7 +230,7 @@ Layouts.DAG = new Class({
 		return root;
 	},
 
-	computeOrderWeights: function(sortedGraph, tree) {
+	reduceEdgeCrossings: function(sortedGraph, tree) {
 		// compute X positions of all nodes
 		var i,j,n,m, sum, count;
 		for (i = 0; i < sortedGraph.length; i++) {
@@ -271,7 +296,7 @@ Layouts.DAG = new Class({
 				tn.span = {left: leftOffset, right: leftOffset + tn.width}
 				leftOffset += tn.width + that.innerSpace;
 				tn.x = (tn.span.right + tn.span.left)/2;
-				console.log("id = " + tn.node.id + " x = " + tn.x +", span.left = " + tn.span.left +", span.right = " + tn.span.right +" width = " + tn.width + " leftOffset=" + leftOffset);
+				$.log("id = " + tn.node.id + " x = " + tn.x +", span.left = " + tn.span.left +", span.right = " + tn.span.right +" width = " + tn.width + " leftOffset=" + leftOffset);
 			}
 		})
 	},

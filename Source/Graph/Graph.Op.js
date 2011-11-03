@@ -657,16 +657,21 @@ Graph.Op = {
 		var graph = this.viz.graph;
 		//find nodes without in-edges
 		graph.eachNode(function(node) {
+			if (!node.dag) {
+				node.dag = {};
+			}
 			if (node.getInAdjacencies().length == 0) { 
 				node._depth = 0;
+				node.dag.level = 0;
 				set[node.id] = node;
 			}
 		});
-
+		var index = 0;
 		//while set is not empty do
 		while ($.keys(set).length > 0) {
 			//take first element from set
 			var n = set[$.keys(set)[0]];
+			n.dag.order = index;
 			order.push(n);
 			var neighbours = [];
 			n.eachOutAdjacency(function(adj) {
@@ -678,12 +683,14 @@ Graph.Op = {
 				other.eachInAdjacency(function(adj) { if (!adj._sortVisited) {unvisitedCount ++}});
 				if (unvisitedCount == 0) {
 					other._depth = n._depth + 1;
+					other.dag.level = n.dag.level + 1;
 					set[other.id] = other;
 				}
 			});
 			
 			//remove this element from set
 			delete set[n.id];
+			index ++;
 		}
 
 		//clear  flags
