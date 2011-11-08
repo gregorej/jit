@@ -179,6 +179,12 @@ $.log = function(message) {
 	}
 };
 
+
+$.round = function(number, accuracy) {
+	accuracy = accuracy || 1;
+	return Math.round(number * accuracy)/accuracy;
+}
+
 /*
   Method: reduce
   

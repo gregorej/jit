@@ -10,7 +10,16 @@ tests_model = {
 			""",
 			'Extras':[],
 			'Example': False
-		}
+		},
+		{
+			'Title':'Flat DAG',
+			'Description':
+			"""
+			DAG with single root and many children
+			""",
+			'Extras':[],
+			'Example': False
+		},
 	],
 
     'RGraph': [

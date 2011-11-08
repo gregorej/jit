@@ -27,7 +27,6 @@ Layouts.DAG = new Class({
     NodeDim.compute(this.graph, prop, this.config);
     this.graph.computeLevels(this.root, 0, "ignore");
     var lengthFunc = this.createLevelDistanceFunc(); 
-    this.computeAngularWidths(prop);
     this.computePositions(prop, lengthFunc);
   },
 
@@ -48,9 +47,11 @@ Layouts.DAG = new Class({
 	},
 */
 	innerSpace: 1,
+
+	__ACCURACY: 10000,
 	
 	computePositions: function(property, getLength) {
-		 var propArray = property;
+		var propArray = property;
 	    var graph = this.graph;
 	    var root = graph.getNode(this.root);
 	    var parent = this.parent;
@@ -60,8 +61,8 @@ Layouts.DAG = new Class({
 		var sortedGraph = this.op.topologicalSort(this.graph);
 		var tree = this.createTreeCopy(sortedGraph);
 		var steps = 2;
-		var length;
-		for (var i= 1; i <= steps; i++) {
+		var length, i, l, pi;
+		for (i= 1; i <= steps; i++) {
 			this.computeSpanForTreeCopy(tree);
 			this.reduceEdgeCrossings(sortedGraph, tree);
 			$.log("After step " + i);
@@ -70,11 +71,14 @@ Layouts.DAG = new Class({
 		
 		var scale = this.config.levelDistance;
 		var width = tree.width * scale;
-		var height = scale * sortedGraph[sortedGraph.length-1]._depth
+		var height = scale * sortedGraph[sortedGraph.length-1].dag.level;
 		$.each(sortedGraph, function(n) {
 			$.log(n.id+" x="+n.dag.x+", y="+n._depth +", orderWeight = " + n.dag.orderWeight);
 			length = getLength(n);
-			n.setPos($C(length*n.dag.x - width / 2, length*n._depth - height / 2));
+			for (i=0, l = propArray.length; i < l; i++) {
+            	pi = propArray[i];
+				n.setPos($C(length*n.dag.x - width / 2, length*n._depth - height / 2), pi);
+         	}
 		});
 		
 	},
@@ -99,11 +103,14 @@ Layouts.DAG = new Class({
 		var slots = {};
 		var optValue = {};
 		var pos, sum, count, parentMed, childMed, parentCount, childrenCount;
+		var slotSpan = this.innerSpace;
+		var accuracy = 10000.0;
 		
 		//sort nodes by their x position
 		nodes.sort(function(n1,n2) { return n1.dag.x - n2.dag.x});
 		$.log(nodes);
-
+	
+		var that = this;
 		//compute slots values
 		$.each(nodes, function(n) {
 			sum = 0;
@@ -116,7 +123,8 @@ Layouts.DAG = new Class({
 				sum += n.getNeighbourAlong(inAdj).dag.x;
 				parentCount++;
 			});
-			parentMed = (parentCount > 0)?sum/parentCount:n.dag.x;
+			parentMed = (parentCount > 0)?$.round(sum/parentCount, that.__ACCURACY):n.dag.x;
+			$.log("parentMed = " + parentMed +", parentCount = " + parentCount +", sum = " + sum +", normal div = " + (sum/parentCount));
 			slots[n.id][1] = {value: (parentCount > 0)?1:0, pos: parentMed};
 			
 			sum = 0;
@@ -125,7 +133,7 @@ Layouts.DAG = new Class({
 				sum += n.getNeighbourAlong(outAdj).dag.x;
 				childrenCount ++;
 			});
-			childMed = (childrenCount > 0)?sum/childrenCount:n.dag.x;
+			childMed = (childrenCount > 0)?$.round(sum/childrenCount, that.__ACCURACY):n.dag.x;
 			slots[n.id][2] = {value: (childrenCount > 0)?1:0, pos: childMed};
 
 			slots[n.id][0] = {value: ((parentCount > 0 && n.dag.x == parentMed) || (childrenCount > 0 && n.dag.x == childMed))?1:0, pos:n.dag.x};
@@ -139,21 +147,25 @@ Layouts.DAG = new Class({
 			optValues[l-1][i] = slots[lastNode.id][i].value;
 		}
 
+
+		$.log(slots);
 		var otherNode, node, best,i,m,s;
 		for (m = nodes.length-2; m >=0; m--) {
 			optValues[m] = new Array(sc);
 			otherNode = nodes[m+1];
 			node = nodes[m];
 			for (s =0; s < sc; s++) {
-				best = 0;
+				best = -1;
+				//find best suiting slot for otherNode if node is at slot s
 				for (i = 0; i < sc; i++) {
 					if (slots[otherNode.id][i].pos > slots[node.id][s].pos) {
-						if (optValues[m+1][i] > optValues[m+1][best]) {
+						if (best == -1 || optValues[m+1][i] > optValues[m+1][best]) {
 							best = i;
 						}
 					}
 				}
-				optValues[m][s] = optValues[m+1][best]+slots[node.id][s].value;
+				//we may have not found a best slot on the right (s'th slot may be too far to the right)
+				optValues[m][s] = ((best > -1)?optValues[m+1][best]+slots[node.id][s].value:0);
 			}
 		}
 
@@ -239,7 +251,7 @@ Layouts.DAG = new Class({
 			sum = 0;
 			$.each(n.dag.copies, function(tn) { sum += tn.x});
 			console.log(n.id+" sum = " + sum);
-			n.dag.x = sum/n.dag.copies.length;
+			n.dag.x = $.round(sum/n.dag.copies.length,this.__ACCURACY);
 		}
 		
 		var currentDepth = 0;
@@ -299,55 +311,7 @@ Layouts.DAG = new Class({
 				$.log("id = " + tn.node.id + " x = " + tn.x +", span.left = " + tn.span.left +", span.right = " + tn.span.right +" width = " + tn.width + " leftOffset=" + leftOffset);
 			}
 		})
-	},
-
-  /*
-   * Method: setAngularWidthForNodes
-   * 
-   * Sets nodes angular widths.
-   */
-  setAngularWidthForNodes : function(prop) {
-    this.graph.eachBFS(this.root, function(elem, i) {
-      var diamValue = elem.getData('angularWidth', prop[0]) || 5;
-      elem._angularWidth = diamValue / i;
-    }, "ignore");
-  },
-
-  /*
-   * Method: setSubtreesAngularWidth
-   * 
-   * Sets subtrees angular widths.
-   */
-  setSubtreesAngularWidth : function() {
-    var that = this;
-    this.graph.eachNode(function(elem) {
-      that.setSubtreeAngularWidth(elem);
-    }, "ignore");
-  },
-
-  /*
-   * Method: setSubtreeAngularWidth
-   * 
-   * Sets the angular width for a subtree.
-   */
-  setSubtreeAngularWidth : function(elem) {
-    var that = this, nodeAW = elem._angularWidth, sumAW = 0;
-    elem.eachSubnode(function(child) {
-      that.setSubtreeAngularWidth(child);
-      sumAW += child._treeAngularWidth;
-    }, "ignore");
-    elem._treeAngularWidth = Math.max(nodeAW, sumAW);
-  },
-
-  /*
-   * Method: computeAngularWidths
-   * 
-   * Computes nodes and subtrees angular widths.
-   */
-  computeAngularWidths : function(prop) {
-    this.setAngularWidthForNodes(prop);
-    this.setSubtreesAngularWidth();
-  }
+	}
 
 });
 
