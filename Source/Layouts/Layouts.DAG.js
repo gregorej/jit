@@ -1,4 +1,6 @@
 /*
+ *
+ * Author: Grzegorz Dyk
  * Class: Layouts.DAG
  * 
  * Implements a DAG Layout.
@@ -91,8 +93,8 @@ Layouts.DAG = new Class({
 
 	straightenLevels: function(sortedGraph) {
 		var levelNum = sortedGraph[sortedGraph.length-1].dag.level;
-		//we are going bottom-up with levels
-		for (var i = levelNum; i>=0; i--) {
+		//we want to straighten all but the last level
+		for (var i = 0; i < levelNum; i++) {
 			this.straightenLevel(sortedGraph, i);
 		}
 	},
@@ -147,7 +149,7 @@ Layouts.DAG = new Class({
 			optValues[l-1][i] = slots[lastNode.id][i].value;
 		}
 
-
+		$.log("slots");
 		$.log(slots);
 		var otherNode, node, best,i,m,s;
 		for (m = nodes.length-2; m >=0; m--) {
@@ -170,6 +172,7 @@ Layouts.DAG = new Class({
 		}
 
 		$.log(slots);
+		$.log("optValues");
 		$.log(optValues);
 		best = 0;
 		var previousBest = -1;

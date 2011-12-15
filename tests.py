@@ -20,6 +20,15 @@ tests_model = {
 			'Extras':[],
 			'Example': False
 		},
+		{
+			'Title':'Service DAG',
+			'Description':
+			"""
+			DAG of CIS services
+			""",
+			'Extras':[],
+			'Example': False
+		}
 	],
 
     'RGraph': [
