@@ -28,6 +28,15 @@ tests_model = {
 			""",
 			'Extras':[],
 			'Example': False
+		},
+		{
+			'Title':'Assymetric DAG',
+			'Description':
+			"""
+			Assymetric EWS
+			""",
+			'Extras':[],
+			'Example': False
 		}
 	],
 

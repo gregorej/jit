@@ -66,6 +66,7 @@ Layouts.DAG = new Class({
 		var length, i, l, pi;
 		for (i= 1; i <= steps; i++) {
 			this.computeSpanForTreeCopy(tree);
+			$.log(tree);
 			this.reduceEdgeCrossings(sortedGraph, tree);
 			$.log("After step " + i);
 		}
@@ -280,7 +281,7 @@ Layouts.DAG = new Class({
 		fn(treeRoot);
 		var i,l;
 		for (i = 0, l = treeRoot.children.length; i < l; i++) {
-			fn(treeRoot.children[i]);
+			this.treePreorder(treeRoot.children[i], fn);
 		}
 	},
 
