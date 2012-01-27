@@ -292,7 +292,7 @@ Layouts.DAG = new Class({
 			this.computeWidthsForTreeCopy(subtree.children[i]);
 			sum += subtree.children[i].width;
 		}
-		//we are assuming self-width to be 1
+		//we are assuming self-width (width of node itself) to be 1
 		subtree.width = Math.max(sum + this.innerSpace * (subtree.children.length-1), 1);
 	},
 
